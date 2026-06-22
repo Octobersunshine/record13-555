@@ -2,13 +2,20 @@ require('dotenv').config();
 const crypto = require('crypto');
 const http = require('http');
 
-const SECRET_KEY = process.env.SIGNATURE_SECRET_KEY || 'your_super_secret_key_here_2024';
+const KEY_VERSION = process.env.SIGNATURE_ACTIVE_VERSION || 'V2';
+const SECRET_KEY = process.env[`SIGNATURE_SECRET_KEY_${KEY_VERSION}`] || 'your_super_secret_key_here_2024';
 const APP_ID = 'client_app_001';
 const BASE_URL = 'localhost';
 const PORT = process.env.PORT || 3000;
 
+console.log(`当前使用密钥版本: ${KEY_VERSION}`);
+console.log(`密钥: ${SECRET_KEY}`);
+
 function generateSignature(method, path, timestamp, nonce, appId, body) {
-  const bodyStr = body ? JSON.stringify(body) : '';
+  let bodyStr = '';
+  if (body && Object.keys(body).length > 0) {
+    bodyStr = JSON.stringify(body);
+  }
   const signStr = `${method.toUpperCase()}\n${path}\n${timestamp}\n${nonce}\n${appId}\n${bodyStr}`;
   
   console.log('签名原始字符串:');
@@ -36,6 +43,7 @@ function sendRequest(method, path, body = null) {
       'X-Timestamp': timestamp,
       'X-Nonce': nonce,
       'X-App-Id': APP_ID,
+      'X-Key-Version': KEY_VERSION,
       'X-Signature': signature
     };
 
@@ -56,6 +64,9 @@ function sendRequest(method, path, body = null) {
       res.on('data', (chunk) => data += chunk);
       res.on('end', () => {
         console.log('响应状态:', res.statusCode);
+        if (res.headers['x-key-deprecated'] === 'true') {
+          console.warn('⚠️  警告: 当前使用的密钥版本已过时，请尽快升级到版本:', res.headers['x-key-latest-version']);
+        }
         console.log('响应数据:', JSON.stringify(JSON.parse(data), null, 2));
         resolve({ status: res.statusCode, data: JSON.parse(data) });
       });

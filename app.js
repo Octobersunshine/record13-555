@@ -1,7 +1,7 @@
 require('dotenv').config();
 
 const express = require('express');
-const { signatureAuth } = require('./middleware/signatureAuth');
+const { signatureAuth, getAvailableVersions, getActiveVersion, SECRET_KEYS } = require('./middleware/signatureAuth');
 const apiRoutes = require('./routes/api');
 
 const app = express();
@@ -36,12 +36,24 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(PORT, () => {
+  const versions = getAvailableVersions();
+  const activeVersion = getActiveVersion();
+  
   console.log('========================================');
   console.log('  Express Signature Auth Server');
   console.log('========================================');
   console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Signature Secret: ${process.env.SIGNATURE_SECRET_KEY || 'default_secret_key'}`);
   console.log(`Signature Expire Time: ${process.env.SIGNATURE_EXPIRE_TIME || '300000'}ms`);
+  console.log('');
+  console.log('🔑 密钥版本配置（平滑切换支持）:');
+  for (const version of versions) {
+    const marker = version === activeVersion ? ' ⭐ 活跃版本' : '';
+    const keyPreview = SECRET_KEYS[version].slice(0, 8) + '...';
+    console.log(`   ${version}: ${keyPreview}${marker}`);
+  }
+  console.log('');
+  console.log(`💡 当前活跃版本: ${activeVersion}`);
+  console.log(`💡 并行生效版本数: ${versions.length} 个（平滑过渡期使用）`);
   console.log('========================================');
   console.log('Public API: GET /api/public/health');
   console.log('Protected APIs:');
@@ -49,5 +61,13 @@ app.listen(PORT, () => {
   console.log('  POST   /api/order/create');
   console.log('  PUT    /api/user/profile');
   console.log('  DELETE /api/order/:id');
+  console.log('========================================');
+  console.log('📋 密钥切换流程:');
+  console.log('   1. 新增 SIGNATURE_SECRET_KEY_V3 配置');
+  console.log('   2. 修改 SIGNATURE_ACTIVE_VERSION=V3');
+  console.log('   3. 重启服务 → V1+V2+V3 同时生效');
+  console.log('   4. 客户端分批升级使用 V3');
+  console.log('   5. 监控日志，所有客户端升级完成后');
+  console.log('   6. 移除 V1 配置，完成切换 ✓');
   console.log('========================================');
 });
