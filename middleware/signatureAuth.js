@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { NonceManager } = require('../utils/nonceManager');
+const { keyExpirationManager } = require('../utils/keyExpirationManager');
 
 const nonceManager = new NonceManager();
 
@@ -158,6 +159,29 @@ function signatureAuth(req, res, next) {
     const upgradeHint = `Please upgrade signature key from version ${verifyResult.matchedVersion} to ${ACTIVE_VERSION}`;
     res.setHeader('X-Key-Upgrade-Hint', Buffer.from(upgradeHint, 'utf8').toString('base64'));
     console.warn(`[WARN] Client using deprecated signature key: AppId=${appId}, CurrentVersion=${verifyResult.matchedVersion}, LatestVersion=${ACTIVE_VERSION}, Path=${path}`);
+  }
+
+  const keyStatus = keyExpirationManager.getAllKeysStatus();
+  const matchedKeyStatus = keyStatus.find(k => k.version === verifyResult.matchedVersion);
+  
+  if (matchedKeyStatus) {
+    res.setHeader('X-Key-Status', matchedKeyStatus.status);
+    res.setHeader('X-Key-Days-Left', matchedKeyStatus.daysLeft.toString());
+    res.setHeader('X-Key-Expire-Date', matchedKeyStatus.expireStr);
+    
+    if (matchedKeyStatus.status === 'expired' || matchedKeyStatus.status === 'warning') {
+      res.setHeader('X-Key-Expiration-Warning', 'true');
+      const warnHint = matchedKeyStatus.status === 'expired' 
+        ? `Key version ${verifyResult.matchedVersion} has expired, please rotate immediately`
+        : `Key version ${verifyResult.matchedVersion} will expire in ${matchedKeyStatus.daysLeft.toFixed(0)} days, please rotate soon`;
+      res.setHeader('X-Key-Expiration-Hint', Buffer.from(warnHint, 'utf8').toString('base64'));
+      
+      if (matchedKeyStatus.status === 'expired') {
+        console.error(`[ERROR] Client using EXPIRED signature key: AppId=${appId}, Version=${verifyResult.matchedVersion}, ExpiredAt=${matchedKeyStatus.expireStr}`);
+      } else {
+        console.warn(`[WARN] Client using soon-to-expire signature key: AppId=${appId}, Version=${verifyResult.matchedVersion}, DaysLeft=${matchedKeyStatus.daysLeft.toFixed(1)}`);
+      }
+    }
   }
 
   next();
