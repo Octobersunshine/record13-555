@@ -1,0 +1,18 @@
+{
+  "name": "express-signature-auth",
+  "version": "1.0.0",
+  "description": "Node.js + Express 接口请求签名密钥校验",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "dotenv": "^16.4.5",
+    "crypto-js": "^4.2.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
